@@ -5,7 +5,7 @@ export const runtime = 'edge';
 
 export async function POST(req: Request) {
   try {
-    const { messages, model = 'gpt-4o' } = await req.json();
+    const { messages, model = 'deepseek-v4-flash' } = await req.json();
 
     const apiKey =
       process.env.LLM_CHRISTMAS_API_KEY ||

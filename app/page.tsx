@@ -55,10 +55,16 @@ const REPOS = [
   },
 ];
 
+// IDs must match llm.christmas / CPA model catalog (see llm-christmas Models page FALLBACK_IDS)
 const MODELS = [
-  { id: 'gpt-4o', label: 'GPT-4o' },
-  { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-  { id: 'deepseek-chat', label: 'DeepSeek V3' },
+  { id: 'grok-4.5', label: 'Grok 4.5' },
+  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+  { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+  { id: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash (Free)' },
+  { id: 'glm-5.2-free', label: 'GLM 5.2 Free' },
+  { id: 'mistral-large-latest', label: 'Mistral Large' },
+  { id: 'minimax-m3', label: 'MiniMax M3' },
+  { id: 'mimo-v2.5-free', label: 'MiMo V2.5 Free' },
 ];
 
 export default function AgentPage() {
