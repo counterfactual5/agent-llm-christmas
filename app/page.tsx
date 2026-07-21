@@ -68,7 +68,7 @@ const MODELS = [
 ];
 
 export default function AgentPage() {
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState('deepseek-v4-flash-free');
   const [error, setError] = useState<string | null>(null);
 
   const { messages, input, setInput, handleInputChange, handleSubmit, isLoading } = useChat({
@@ -106,7 +106,7 @@ export default function AgentPage() {
                 </span>
               </h1>
               <p className="text-xs text-slate-400">
-                Powered by CPA gateway · left panel = OSS suite (not live tools yet)
+                Model via llm.christmas API · left panel = OSS suite (tools next)
               </p>
             </div>
           </div>
@@ -122,15 +122,6 @@ export default function AgentPage() {
                 </option>
               ))}
             </select>
-            <a
-              href="https://llm.christmas"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 font-medium transition text-white flex items-center gap-1.5"
-            >
-              Gateway Status
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
         </div>
       </header>
@@ -181,8 +172,8 @@ export default function AgentPage() {
                   <p className="font-semibold mb-0.5">Request failed</p>
                   <p className="text-red-200/90 break-all">{error}</p>
                   <p className="text-red-200/70 mt-1">
-                    Check Vercel env: LLM_CHRISTMAS_BASE_URL (e.g. https://cpa.llm.christmas/v1) and
-                    LLM_CHRISTMAS_API_KEY. Model id must exist on CPA.
+                    Set Vercel env LLM_CHRISTMAS_BASE_URL=https://api.llm.christmas/v1 and a valid
+                    LLM_CHRISTMAS_API_KEY (sk-... from llm.christmas). Model id must match catalog.
                   </p>
                 </div>
               </div>
