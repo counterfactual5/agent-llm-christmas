@@ -5,15 +5,58 @@ export const maxDuration = 60;
 
 const SYSTEM_PROMPT = `You are the Web3 & DeFi Agent on agent.llm.christmas, a public showcase of open-source DeFi/agent tooling by github.com/counterfactual5.
 
-You have 4 built-in tools:
+You have live Web3 tools powered by VPS microservices:
+- polymarket_search: Search prediction markets & real-time odds on Polymarket via polymarket-sdk
+- uniswap_quote: Query swap paths & price impact via uni-exec-engine
+- hyperliquid_snapshot: Query perps open interest, mark price & funding rate via hl-trade-flow
+- defi_doctor: Check health & risk metrics of lending/staking protocols via defi-omni-cli
 - get_token_price: live USD prices (CoinGecko)
 - get_defi_tvl: protocol TVL (DefiLlama)
 - get_github_repo: GitHub repo stats
-- get_gas_price: current Ethereum gas
 
-Use tools for price/TVL/gas/repo questions. Always cite the data source. For everything else answer from your knowledge. Format in Markdown. Be concise and helpful.`;
+Use tools for price/TVL/prediction/gas/repo questions. Always cite the data source. For everything else answer from your knowledge. Format in Markdown. Be concise and helpful.`;
 
 const TOOL_DEFINITIONS = [
+  {
+    type: 'function',
+    function: {
+      name: 'polymarket_search',
+      description: 'Search prediction markets, outcome prices, and volume on Polymarket via polymarket-sdk.',
+      parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword, e.g. "election", "btc", "fed".' } }, required: ['query'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'uniswap_quote',
+      description: 'Get automated swap quotes, price impact, and path routing on Uniswap via uni-exec-engine.',
+      parameters: {
+        type: 'object',
+        properties: {
+          token_in: { type: 'string', description: 'Input token symbol, e.g. "ETH"' },
+          token_out: { type: 'string', description: 'Output token symbol, e.g. "USDC"' },
+          amount_in: { type: 'number', description: 'Amount of input token' },
+        },
+        required: ['token_in', 'token_out', 'amount_in'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'hyperliquid_snapshot',
+      description: 'Get perpetual futures market snapshot (funding rate, mark price, open interest) via hl-trade-flow.',
+      parameters: { type: 'object', properties: { symbol: { type: 'string', description: 'Ticker symbol, e.g. "BTC" or "ETH".' } }, required: ['symbol'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'defi_doctor',
+      description: 'Run health factor and risk diagnostic checks across DeFi protocols via defi-omni-cli.',
+      parameters: { type: 'object', properties: { protocol: { type: 'string', description: 'Protocol name, e.g. "aave", "compound", "morpho".' } } },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -63,6 +106,33 @@ async function fetchJson(url: string, init: RequestInit = {}): Promise<any> {
 
 async function executeTool(name: string, args: any): Promise<string> {
   try {
+    if (name === 'polymarket_search') {
+      const q = String(args.query || args.q || '').trim();
+      const data = await fetchJson(`https://cpa.llm.christmas/tools/polymarket/search?q=${encodeURIComponent(q)}`);
+      return JSON.stringify({ source: 'Polymarket (polymarket-sdk)', data });
+    }
+    if (name === 'uniswap_quote') {
+      const data = await fetchJson('https://cpa.llm.christmas/tools/uniswap/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token_in: args.token_in || 'ETH',
+          token_out: args.token_out || 'USDC',
+          amount_in: Number(args.amount_in || 1),
+        }),
+      });
+      return JSON.stringify({ source: 'Uniswap (uni-exec-engine)', data });
+    }
+    if (name === 'hyperliquid_snapshot') {
+      const symbol = String(args.symbol || 'BTC').trim();
+      const data = await fetchJson(`https://cpa.llm.christmas/tools/hyperliquid/snapshot?symbol=${encodeURIComponent(symbol)}`);
+      return JSON.stringify({ source: 'Hyperliquid (hl-trade-flow)', data });
+    }
+    if (name === 'defi_doctor') {
+      const protocol = String(args.protocol || 'aave').trim();
+      const data = await fetchJson(`https://cpa.llm.christmas/tools/defi/doctor?protocol=${encodeURIComponent(protocol)}`);
+      return JSON.stringify({ source: 'DeFi Omni Doctor (defi-omni-cli)', data });
+    }
     if (name === 'get_token_price') {
       const ids = String(args.ids || '').trim();
       const data = await fetchJson(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`);
