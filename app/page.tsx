@@ -59,7 +59,7 @@ const REPOS = [
 
 const MODELS = [
   { id: 'deepseek-v4-flash-200k', label: 'DeepSeek V4 Flash 200K' },
-  { id: 'deepseek-v4-pro-200k', label: 'DeepSeek V4 Pro 200K' },
+  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
   { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
   { id: 'glm-5.2', label: 'GLM 5.2' },
   { id: 'mistral-large-latest', label: 'Mistral Large' },
