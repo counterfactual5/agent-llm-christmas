@@ -28,13 +28,13 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'uniswap_quote_plan',
-      description: 'Use uni-exec-engine to resolve tokens and construct a real Uniswap Trading API quote request without inventing an output amount.',
+      description: 'Use uni-exec-engine to construct a real Uniswap Trading API payload AND read the live V3 pool price on-chain. Returns the request plan, a coingecko indicative price (via the package price_feed) and, when the VPS public RPC allows it, the live V3 pool mid price.',
       parameters: {
         type: 'object',
         properties: {
-          token_in: { type: 'string', description: 'Input token symbol or address, e.g. ETH.' },
-          token_out: { type: 'string', description: 'Output token symbol or address, e.g. USDC.' },
-          amount_in: { type: 'string', description: 'Human-readable input amount.' },
+          token_in: { type: 'string', description: 'Input token symbol or address, e.g. "ETH".' },
+          token_out: { type: 'string', description: 'Output token symbol or address, e.g. "USDC".' },
+          amount_in: { type: 'string', description: 'Human-readable input amount, e.g. "1".' },
           chain: { type: 'string', description: 'Chain name, default ethereum.' },
           slippage_pct: { type: 'number', description: 'Maximum slippage percentage, default 0.5.' },
         },
