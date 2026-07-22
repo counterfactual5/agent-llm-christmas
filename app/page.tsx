@@ -11,10 +11,10 @@ import {
   AlertCircle,
   Github,
   Code2,
-  ChevronRight,
   Database,
   TerminalSquare,
-  Network
+  Network,
+  MessageSquare,
 } from 'lucide-react';
 import { Markdown } from '@/components/Markdown';
 
@@ -255,7 +255,7 @@ export default function AgentPage() {
                           ? 'bg-slate-100 text-slate-800 rounded-2xl rounded-tr-sm border border-slate-200'
                           : 'bg-white text-slate-700 rounded-2xl rounded-tl-sm border border-slate-200'
                       }`}>
-                        {isUser ? <div className="whitespace-pre-wrap">{m.content}</div> : <Markdown content={m.content || ''} />}
+                        {isUser ? <div className="whitespace-pre-wrap">{m.content}</div> : <Markdown>{m.content || ''}</Markdown>}
                       </div>
                     </div>
                   );

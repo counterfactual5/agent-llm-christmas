@@ -3,34 +3,51 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-/** Markdown renderer — styling comes from the md-* classes in globals.css. */
 export function Markdown({ children }: { children: string }) {
   return (
     <div className="md-body">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: (props) => <a {...props} target="_blank" rel="noreferrer" className="md-a" />,
-          p: (props) => <p {...props} className="md-p" />,
-          h1: (props) => <h1 {...props} className="md-h1" />,
-          h2: (props) => <h2 {...props} className="md-h2" />,
-          h3: (props) => <h3 {...props} className="md-h3" />,
-          h4: (props) => <h4 {...props} className="md-h4" />,
-          ul: (props) => <ul {...props} className="md-ul" />,
-          ol: (props) => <ol {...props} className="md-ol" />,
-          li: (props) => <li {...props} className="md-li" />,
-          strong: (props) => <strong {...props} className="md-strong" />,
-          code: (props) => <code {...props} className="md-code-inline" />,
-          pre: (props) => <pre {...props} className="md-pre" />,
-          table: (props) => (
+          h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
+          h2: ({ children }) => <h2 className="md-h2">{children}</h2>,
+          h3: ({ children }) => <h3 className="md-h3">{children}</h3>,
+          h4: ({ children }) => <h4 className="md-h4">{children}</h4>,
+          p: ({ children }) => <p className="md-p">{children}</p>,
+          ul: ({ children }) => <ul className="md-ul">{children}</ul>,
+          ol: ({ children }) => <ol className="md-ol">{children}</ol>,
+          li: ({ children }) => <li className="md-li">{children}</li>,
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noreferrer" className="md-a">
+              {children}
+            </a>
+          ),
+          code: ({ className, children, ...props }) => {
+            const isBlock = Boolean(className);
+            if (isBlock) {
+              return (
+                <code className={`md-code-block ${className || ''}`} {...props}>
+                  {children}
+                </code>
+              );
+            }
+            return (
+              <code className="md-code-inline" {...props}>
+                {children}
+              </code>
+            );
+          },
+          pre: ({ children }) => <pre className="md-pre">{children}</pre>,
+          table: ({ children }) => (
             <div className="md-table-wrap">
-              <table {...props} className="md-table" />
+              <table className="md-table">{children}</table>
             </div>
           ),
-          th: (props) => <th {...props} className="md-th" />,
-          td: (props) => <td {...props} className="md-td" />,
-          blockquote: (props) => <blockquote {...props} className="md-quote" />,
+          th: ({ children }) => <th className="md-th">{children}</th>,
+          td: ({ children }) => <td className="md-td">{children}</td>,
+          blockquote: ({ children }) => <blockquote className="md-quote">{children}</blockquote>,
           hr: () => <hr className="md-hr" />,
+          strong: ({ children }) => <strong className="md-strong">{children}</strong>,
         }}
       >
         {children}
