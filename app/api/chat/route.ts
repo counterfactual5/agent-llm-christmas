@@ -15,6 +15,9 @@ The tools call published Python packages running on a read-only VPS bridge:
 - polymarket_market_snapshot: polymarket-sdk resolves an outcome token, fetches its live CLOB book/mid/spread, and validates whether the snapshot is tradeable.
 - hyperliquid_quote: hl-trade-flow walks the live L2 book and estimates fill price, size, slippage, cost, and depth after validating the snapshot.
 - defi_doctor: defi-omni-cli performs real RPC, chain-id, gas, wallet, and optional policy preflight checks. It does not return protocol TVL or fabricated health factors.
+- wallet_balance_scan: evm-wallet-scanner scans native and common ERC20 token balances for a wallet.
+- wallet_approval_scan: erc20-checker scans a wallet's active token approvals and spent allowances to locate risks.
+- wallet_revoke_plan: erc20-checker builds the raw tx payload to revoke a token approval.
 - get_token_price, get_defi_tvl, get_github_repo, get_gas_price: public reference-data tools.
 
 Rules:
@@ -134,6 +137,52 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
+      name: 'wallet_balance_scan',
+      description: 'Scan native and ERC20 token balances for a wallet via evm-wallet-scanner.',
+      parameters: {
+        type: 'object',
+        properties: {
+          wallet: { type: 'string', description: 'EVM address to scan.' },
+          chain: { type: 'string', default: 'ethereum' },
+        },
+        required: ['wallet'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'wallet_approval_scan',
+      description: 'Scan active token approvals and spenders for a wallet via erc20-checker.',
+      parameters: {
+        type: 'object',
+        properties: {
+          wallet: { type: 'string', description: 'EVM address to scan.' },
+          chain: { type: 'string', default: 'ethereum' },
+        },
+        required: ['wallet'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'wallet_revoke_plan',
+      description: 'Build a raw revoke transaction payload to set a spender allowance to 0 via erc20-checker.',
+      parameters: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Token contract address.' },
+          spender: { type: 'string', description: 'Spender contract address to revoke.' },
+          chain: { type: 'string', default: 'ethereum' },
+        },
+        required: ['token', 'spender'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_token_price',
       description: 'Get current USD prices and 24h changes via CoinGecko.',
       parameters: { type: 'object', properties: { ids: { type: 'string', description: 'Comma-separated CoinGecko ids.' } }, required: ['ids'] },
@@ -235,6 +284,22 @@ async function executeTool(name: string, args: any): Promise<string> {
       if (args.amount) params.set('amount', String(args.amount));
       const data = await fetchJson(`${TOOL_BASE_URL}/defi/doctor?${params}`);
       return JSON.stringify({ source: 'defi-omni-cli.run_doctor', data });
+    }
+    if (name === 'wallet_balance_scan') {
+      const data = await fetchJson(`${TOOL_BASE_URL}/wallet/balance-scan?wallet=${encodeURIComponent(args.wallet)}&chain=${encodeURIComponent(args.chain || 'ethereum')}`);
+      return JSON.stringify({ source: 'evm-wallet-scanner.query_chain_assets', data });
+    }
+    if (name === 'wallet_approval_scan') {
+      const data = await fetchJson(`${TOOL_BASE_URL}/wallet/approval-scan?wallet=${encodeURIComponent(args.wallet)}&chain=${encodeURIComponent(args.chain || 'ethereum')}`);
+      return JSON.stringify({ source: 'erc20-checker.scan_approvals', data });
+    }
+    if (name === 'wallet_revoke_plan') {
+      const data = await postTool('/wallet/revoke-plan', {
+        token: args.token,
+        spender: args.spender,
+        chain: args.chain || 'ethereum',
+      });
+      return JSON.stringify({ source: 'erc20-checker.build_revoke_tx', data });
     }
     if (name === 'get_token_price') {
       const raw = String(args.ids || args.token || '').trim();
