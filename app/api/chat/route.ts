@@ -273,13 +273,13 @@ function parseValue(value: string, stringFlag?: string): unknown {
 }
 
 function parseDsmlToolCalls(content: string): any[] {
-  if (!content || !/[<]?[｜|]DSML[｜|]/i.test(content)) return [];
+  if (!content || !/[<]?[｜|]\s*DSML\s*[｜|]/i.test(content)) return [];
   const calls: any[] = [];
-  const invokeRe = /<[｜|]DSML[｜|]invoke\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/[｜|]DSML[｜|]invoke>/gi;
+  const invokeRe = /<[｜|]\s*DSML\s*[｜|]\s*invoke\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/[｜|]\s*DSML\s*[｜|]\s*invoke\s*>/gi;
   let invoke: RegExpExecArray | null;
   while ((invoke = invokeRe.exec(content))) {
     const args: Record<string, unknown> = {};
-    const paramRe = /<[｜|]DSML[｜|]parameter\s+name=["']([^"']+)["'](?:\s+string=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/[｜|]DSML[｜|]parameter>/gi;
+    const paramRe = /<[｜|]\s*DSML\s*[｜|]\s*parameter\s+name=["']([^"']+)["'](?:\s+string=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/[｜|]\s*DSML\s*[｜|]\s*parameter\s*>/gi;
     let param: RegExpExecArray | null;
     while ((param = paramRe.exec(invoke[2]))) args[param[1]] = parseValue(param[3], param[2]);
     calls.push({ id: `dsml_${calls.length}_${Date.now()}`, type: 'function', function: { name: invoke[1], arguments: JSON.stringify(args) } });
@@ -289,9 +289,9 @@ function parseDsmlToolCalls(content: string): any[] {
 
 function stripInternalToolSyntax(text: string): string {
   return text
-    .replace(/<[｜|]DSML[｜|]tool_calls>[\s\S]*?<\/[｜|]DSML[｜|]tool_calls>/gi, '')
-    .replace(/<[｜|]DSML[｜|][^>]*>/gi, '')
-    .replace(/<\/[｜|]DSML[｜|][^>]*>/gi, '')
+    .replace(/<[｜|]\s*DSML\s*[｜|]\s*tool_calls\s*>[\s\S]*?<\/[｜|]\s*DSML\s*[｜|]\s*tool_calls\s*>/gi, '')
+    .replace(/<[｜|]\s*DSML\s*[｜|][^>]*>/gi, '')
+    .replace(/<\/[｜|]\s*DSML\s*[｜|][^>]*>/gi, '')
     .trim();
 }
 
