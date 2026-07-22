@@ -58,18 +58,16 @@ const REPOS = [
 ];
 
 const MODELS = [
-  { id: 'grok-4.5', label: 'Grok 4.5' },
-  { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
+  { id: 'deepseek-v4-flash-200k', label: 'DeepSeek V4 Flash 200K' },
+  { id: 'deepseek-v4-pro-200k', label: 'DeepSeek V4 Pro 200K' },
   { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-  { id: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free' },
-  { id: 'glm-5.2-free', label: 'GLM 5.2 Free' },
+  { id: 'glm-5.2', label: 'GLM 5.2' },
   { id: 'mistral-large-latest', label: 'Mistral Large' },
   { id: 'minimax-m3', label: 'MiniMax M3' },
-  { id: 'mimo-v2.5-free', label: 'MiMo V2.5 Free' },
 ];
 
 export default function AgentPage() {
-  const [selectedModel, setSelectedModel] = useState('deepseek-v4-flash-free');
+  const [selectedModel, setSelectedModel] = useState('deepseek-v4-flash-200k');
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 

@@ -57,7 +57,7 @@ function plainTextResponse(text: string) {
 
 export async function POST(req: Request) {
   try {
-    const { messages, model = 'deepseek-v4-flash' } = await req.json();
+    const { messages, model = 'deepseek-v4-flash-200k' } = await req.json();
 
     const apiKey = process.env.LLM_CHRISTMAS_API_KEY || process.env.OPENAI_API_KEY || '';
     const baseURL = (process.env.LLM_CHRISTMAS_BASE_URL || 'https://api.llm.christmas/v1').replace(/\/$/, '');
