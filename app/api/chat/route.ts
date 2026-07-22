@@ -276,6 +276,13 @@ export async function POST(req: Request) {
 async function* toTextStream(response: any) {
   for await (const chunk of response) {
     const delta = chunk?.choices?.[0]?.delta?.content;
-    if (delta) yield delta;
+    if (delta) {
+      // DeepSeek models sometimes leak their internal tool-calling tokens
+      // like `<｜DSML｜tool_calls｜>` or `<｜tool calls｜>`. Filter them out.
+      const cleanedDelta = delta
+        .replace(/<｜.*?｜>/g, '')
+        .replace(/<\|.*?\|>/g, '');
+      if (cleanedDelta) yield cleanedDelta;
+    }
   }
 }
