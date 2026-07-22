@@ -2,8 +2,8 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Agent LLM Christmas — Web3 & DeFi Agent Showcase',
-  description: 'Agentic workspace and OSS toolkit showcase powered by LLM.Christmas gateway',
+  title: 'agent.llm.christmas — Web3 & DeFi Agent',
+  description: 'Modern agent showcase powered by llm.christmas gateway and OSS execution engines',
 }
 
 export default function RootLayout({
@@ -13,6 +13,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>{children}</body>
     </html>
   )

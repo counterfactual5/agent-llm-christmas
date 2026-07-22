@@ -1,82 +1,71 @@
 'use client';
 
 import { useChat } from 'ai/react';
-import { useState } from 'react';
-import { ExternalLink, Activity, Bot, Send, Code, Sparkles, AlertCircle } from 'lucide-react';
-
-const REPOS = [
-  {
-    name: 'uni-exec-engine',
-    tag: 'Core Execution Engine',
-    desc: 'Uniswap v2/v3/v4 execution engine: quote → approve → sign → broadcast, plus LP auto-rebalance (13K LOC, 99 tests).',
-    url: 'https://github.com/counterfactual5/uni-exec-engine',
-    badge: 'Python',
-    toolStatus: 'Showcase',
-  },
-  {
-    name: 'defi-omni-cli',
-    tag: 'Multi-Protocol CLI',
-    desc: 'One CLI for Morpho Blue, Moonwell, Aave V3, Uniswap V3, 1inch, Lido, Compound, CCTP, and deBridge.',
-    url: 'https://github.com/counterfactual5/defi-omni-cli',
-    badge: 'Python',
-    toolStatus: 'Showcase',
-  },
-  {
-    name: 'hl-trade-flow',
-    tag: 'Perp DEX Trading',
-    desc: 'Practical trading flow on top of official Hyperliquid SDK: quotes, slippage, positions, and orderbook.',
-    url: 'https://github.com/counterfactual5/hl-trade-flow',
-    badge: 'Python',
-    toolStatus: 'Showcase',
-  },
-  {
-    name: 'polymarket-py',
-    tag: 'Prediction Market SDK',
-    desc: 'The Python client Polymarket never shipped: zero-dep market data + CLOB trading (EIP-191), 25+ endpoints.',
-    url: 'https://github.com/counterfactual5/polymarket-py',
-    badge: 'Python',
-    toolStatus: 'Planned tool',
-  },
-  {
-    name: 'agent-delegate',
-    tag: 'Multi-Agent Orchestration',
-    desc: 'Production-grade multi-agent router with intelligent routing, fallback chains, and pipeline workers.',
-    url: 'https://github.com/counterfactual5/agent-delegate',
-    badge: 'Python',
-    toolStatus: 'Showcase',
-  },
-  {
-    name: 'Claude-Science-Proxy',
-    tag: 'Tauri Desktop App',
-    desc: 'Run Claude Science on your own model APIs with local sandbox, Skills/MCP managers, and web-search.',
-    url: 'https://github.com/counterfactual5/Claude-Science-Proxy',
-    badge: 'Rust / Tauri',
-    toolStatus: 'Showcase',
-  },
-];
+import { useEffect, useRef, useState } from 'react';
+import {
+  Activity,
+  AlertCircle,
+  Bot,
+  ExternalLink,
+  Github,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Square,
+} from 'lucide-react';
+import { Markdown } from '@/components/Markdown';
+import { RepoPanel } from '@/components/RepoPanel';
+import { ToolCard, ToolEventData } from '@/components/ToolCard';
 
 // IDs must match llm.christmas / CPA model catalog (see llm-christmas Models page FALLBACK_IDS)
 const MODELS = [
+  { id: 'deepseek-v4-flash-200k', label: 'DeepSeek V4 Flash 200K' },
   { id: 'grok-4.5', label: 'Grok 4.5' },
   { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
   { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-  { id: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash (Free)' },
   { id: 'glm-5.2-free', label: 'GLM 5.2 Free' },
   { id: 'mistral-large-latest', label: 'Mistral Large' },
   { id: 'minimax-m3', label: 'MiniMax M3' },
   { id: 'mimo-v2.5-free', label: 'MiMo V2.5 Free' },
 ];
 
-export default function AgentPage() {
-  const [selectedModel, setSelectedModel] = useState('deepseek-v4-flash-free');
-  const [error, setError] = useState<string | null>(null);
+const SUGGESTIONS = [
+  {
+    title: 'Live token prices',
+    prompt: 'What is the current price of ETH and BTC? Include the 24h change.',
+  },
+  {
+    title: 'Uniswap TVL',
+    prompt: "What is Uniswap's current TVL? Break it down by chain.",
+  },
+  {
+    title: 'About uni-exec-engine',
+    prompt: 'How many stars does uni-exec-engine have, and what does the repo do?',
+  },
+  {
+    title: 'Gas check',
+    prompt: 'What is Ethereum gas right now? Is it a good time to transact?',
+  },
+];
 
-  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading } = useChat({
+function toolEventsOf(annotations: unknown): ToolEventData[] {
+  if (!Array.isArray(annotations)) return [];
+  return annotations.filter(
+    (a): a is ToolEventData =>
+      !!a && typeof a === 'object' && (a as any).type === 'tool_event' && !!(a as any).tool
+  );
+}
+
+export default function AgentPage() {
+  const [selectedModel, setSelectedModel] = useState(MODELS[0].id);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { messages, input, setInput, handleInputChange, handleSubmit, isLoading, stop } = useChat({
     api: '/api/chat',
     body: { model: selectedModel },
-    onError: (err) => {
-      setError(err.message || 'Chat request failed');
-    },
+    onError: (err) => setError(err.message || 'Chat request failed'),
     onResponse: (res) => {
       if (!res.ok) {
         res
@@ -90,31 +79,44 @@ export default function AgentPage() {
     },
   });
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, isLoading]);
+
+  const suggest = (prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Bot className="w-5 h-5" />
+    <div className="min-h-screen text-slate-100">
+      {/* top bar */}
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#070a12]/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400/20 to-violet-500/20 ring-1 ring-white/10">
+              <Bot className="h-5 w-5 text-sky-300" />
             </div>
-            <div>
-              <h1 className="font-bold text-base flex items-center gap-2">
-                agent.llm.christmas
-                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                  Agent Showcase
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-sm font-semibold tracking-tight text-white sm:text-base">
+                  agent.llm.christmas
+                </h1>
+                <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-300 ring-1 ring-amber-400/20">
+                  Live Tools
                 </span>
-              </h1>
-              <p className="text-xs text-slate-400">
-                Model via llm.christmas API · left panel = OSS suite (tools next)
+              </div>
+              <p className="truncate text-[11px] text-slate-400">
+                Web3 agent demo with built-in price / TVL / repo / gas tools
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+
+          <div className="flex shrink-0 items-center gap-2">
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-slate-800 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 outline-none focus:border-blue-500"
+              className="max-w-[130px] rounded-xl border border-white/10 bg-slate-900/80 px-2.5 py-1.5 text-xs text-slate-100 outline-none transition focus:ring-2 focus:ring-sky-400/40 sm:max-w-none"
             >
               {MODELS.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -122,147 +124,187 @@ export default function AgentPage() {
                 </option>
               ))}
             </select>
+            <a
+              href="https://github.com/counterfactual5"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="GitHub profile"
+              className="hidden rounded-xl border border-white/10 bg-slate-900/80 p-1.5 text-slate-300 transition hover:bg-slate-800 sm:flex"
+            >
+              <Github className="h-4 w-4" />
+            </a>
+            <a
+              href="https://llm.christmas"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-lg shadow-sky-900/30 transition hover:brightness-110"
+            >
+              Gateway
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 space-y-4">
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-            <h2 className="text-sm font-bold text-slate-200 flex items-center gap-2 mb-1">
-              <Code className="w-4 h-4 text-blue-400" />
-              DeFi & Agent Execution Suite
-            </h2>
-            <p className="text-xs text-slate-400 mb-3">
-              These are your GitHub projects. Chat currently talks to the model via CPA;
-              tool adapters (HTTP wrappers around these repos) come next.
-            </p>
-            <div className="space-y-2.5 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
-              {REPOS.map((repo) => (
-                <a
-                  key={repo.name}
-                  href={repo.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block p-3 rounded-lg bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 transition group"
-                >
-                  <div className="flex items-center justify-between mb-1 gap-2">
-                    <span className="font-semibold text-xs text-blue-400 group-hover:text-blue-300 flex items-center gap-1">
-                      {repo.name}
-                      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition" />
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 shrink-0">
-                      {repo.badge}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{repo.desc}</p>
-                  <p className="text-[10px] text-amber-400/80 mt-1.5">{repo.toolStatus}</p>
-                </a>
-              ))}
+      <main className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-12 lg:gap-5 lg:py-5">
+        {/* chat — first on mobile, right column on desktop */}
+        <section className="order-1 flex min-h-[70vh] flex-col lg:order-2 lg:col-span-8 xl:col-span-9">
+          <div className="glass flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-[22px] lg:min-h-[calc(100vh-120px)]">
+            <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-white">
+                <MessageSquare className="h-4 w-4 text-violet-300" />
+                Conversation
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                Model <span className="text-slate-200">{selectedModel}</span>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div className="lg:col-span-8 flex flex-col bg-slate-900/40 border border-slate-800 rounded-xl h-[calc(100vh-120px)] overflow-hidden">
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-            {error && (
-              <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 flex gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold mb-0.5">Request failed</p>
-                  <p className="text-red-200/90 break-all">{error}</p>
-                  <p className="text-red-200/70 mt-1">
-                    Set Vercel env LLM_CHRISTMAS_BASE_URL=https://api.llm.christmas/v1 and a valid
-                    LLM_CHRISTMAS_API_KEY (sk-... from llm.christmas). Model id must match catalog.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {messages.length === 0 && !error ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <div className="max-w-md">
-                  <h3 className="font-bold text-slate-200 text-base mb-1">Web3 Agent Interactive Demo</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                    Chat is live via CPA. Left-side repos are showcase links; wiring them as server tools is the next step.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
-                    <button
-                      type="button"
-                      onClick={() => setInput('Explain what uni-exec-engine does and how it differs from a thin Uniswap SDK.')}
-                      className="p-2.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-xs text-slate-300 text-left transition"
-                    >
-                      <span className="text-blue-400 font-medium block mb-0.5">About uni-exec-engine</span>
-                      How it differs from a thin SDK
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInput('What tools should a DeFi research agent expose as read-only HTTP APIs?')}
-                      className="p-2.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-xs text-slate-300 text-left transition"
-                    >
-                      <span className="text-blue-400 font-medium block mb-0.5">Agent tool design</span>
-                      Read-only HTTP tools for DeFi
-                    </button>
+            <div className="scrollbar-thin flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:px-5">
+              {error && (
+                <div className="flex gap-2 rounded-2xl border border-red-400/25 bg-red-500/10 px-3 py-2.5 text-xs text-red-100">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Request failed</p>
+                    <p className="mt-0.5 break-all text-red-100/90">{error}</p>
+                    <p className="mt-1 text-red-100/70">
+                      Check env: LLM_CHRISTMAS_API_KEY and LLM_CHRISTMAS_BASE_URL (default
+                      https://api.llm.christmas/v1). Model id must exist on the gateway.
+                    </p>
                   </div>
                 </div>
-              </div>
-            ) : (
-              messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {m.role !== 'user' && (
-                    <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
-                      <Bot className="w-4 h-4" />
+              )}
+
+              {messages.length === 0 && !error ? (
+                <div className="flex h-full flex-col items-center justify-center px-2 py-10 text-center">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-sky-400/20 to-violet-500/20 ring-1 ring-white/10">
+                    <Sparkles className="h-7 w-7 text-sky-300" />
+                  </div>
+                  <h2 className="text-lg font-semibold tracking-tight text-white">
+                    Web3 Agent with Live Built-in Tools
+                  </h2>
+                  <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-400">
+                    The agent calls free public APIs mid-chat — prices, TVL, repo stats, gas. Tool
+                    calls show up as cards above the answer. Try one:
+                  </p>
+                  <div className="mt-6 grid w-full max-w-2xl grid-cols-1 gap-2 sm:grid-cols-2">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s.title}
+                        type="button"
+                        onClick={() => suggest(s.prompt)}
+                        className="rounded-2xl border border-white/8 bg-white/[0.03] p-3 text-left transition hover:border-sky-400/30 hover:bg-sky-400/5"
+                      >
+                        <div className="text-xs font-semibold text-sky-200">{s.title}</div>
+                        <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-400">
+                          {s.prompt}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                messages.map((m) => {
+                  const isUser = m.role === 'user';
+                  const toolEvents = isUser ? [] : toolEventsOf(m.annotations);
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {!isUser && (
+                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400/20 to-violet-500/20 ring-1 ring-white/10">
+                          <Bot className="h-4 w-4 text-sky-300" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[min(100%,720px)] ${isUser ? 'flex flex-col items-end' : 'space-y-2'}`}
+                      >
+                        {toolEvents.length > 0 && (
+                          <div className="w-full space-y-1.5">
+                            {toolEvents.map((ev, i) => (
+                              <ToolCard key={`${ev.tool}-${i}`} event={ev} />
+                            ))}
+                          </div>
+                        )}
+                        <div
+                          className={`rounded-[18px] px-3.5 py-2.5 text-[13px] leading-relaxed sm:px-4 ${
+                            isUser
+                              ? 'rounded-br-md bg-gradient-to-br from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-900/20'
+                              : 'rounded-bl-md border border-white/8 bg-white/[0.04] text-slate-100'
+                          }`}
+                        >
+                          {isUser ? (
+                            <div className="whitespace-pre-wrap">{m.content}</div>
+                          ) : (
+                            <Markdown>{m.content}</Markdown>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div
-                    className={`max-w-[85%] rounded-xl px-4 py-2.5 text-xs leading-relaxed whitespace-pre-wrap ${
-                      m.role === 'user'
-                        ? 'bg-blue-600 text-white rounded-br-none'
-                        : 'bg-slate-800/90 border border-slate-700/70 text-slate-200 rounded-bl-none'
-                    }`}
-                  >
-                    {m.content}
-                  </div>
-                </div>
-              ))
-            )}
-            {isLoading && (
-              <div className="flex gap-2 items-center text-xs text-slate-400 italic">
-                <Activity className="w-3.5 h-3.5 animate-spin text-blue-400" />
-                Agent is processing request...
-              </div>
-            )}
-          </div>
+                  );
+                })
+              )}
 
-          <form onSubmit={handleSubmit} className="p-3 border-t border-slate-800 bg-slate-900/60">
-            <div className="flex items-center gap-2">
-              <input
-                value={input}
-                onChange={handleInputChange}
-                placeholder="Ask the Web3 Agent..."
-                className="flex-1 bg-slate-800/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition"
-              />
-              <button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-xs transition flex items-center gap-1.5"
-              >
-                <span>Send</span>
-                <Send className="w-3.5 h-3.5" />
-              </button>
+              {isLoading && (
+                <div className="flex items-center gap-2 pl-10 text-xs text-slate-400">
+                  <Activity className="h-3.5 w-3.5 animate-spin text-sky-300" />
+                  Agent is thinking — this may include live tool calls…
+                </div>
+              )}
+              <div ref={bottomRef} />
             </div>
-            <p className="text-[10px] text-slate-500 mt-2 px-1">
-              Model: <span className="text-slate-300">{selectedModel}</span> · scripts for skills live in each GitHub
-              repo / skills-formyself; this site does not shell-exec them yet.
-            </p>
-          </form>
-        </div>
+
+            <form onSubmit={handleSubmit} className="border-t border-white/5 bg-black/20 p-3 sm:p-4">
+              <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-slate-950/70 p-2 shadow-inner ring-1 ring-white/5 focus-within:border-sky-400/40 focus-within:ring-sky-400/20">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  rows={1}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!isLoading && input.trim()) {
+                        handleSubmit(e as any);
+                      }
+                    }
+                  }}
+                  placeholder="Ask about prices, TVL, repos, gas — or anything else…"
+                  className="max-h-36 min-h-[44px] flex-1 resize-none bg-transparent px-2 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500"
+                />
+                {isLoading ? (
+                  <button
+                    type="button"
+                    onClick={stop}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+                  >
+                    <Square className="h-4 w-4" />
+                    <span className="hidden sm:inline">Stop</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim()}
+                    className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 text-sm font-semibold text-white shadow-lg shadow-sky-900/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Send className="h-4 w-4" />
+                    <span className="hidden sm:inline">Send</span>
+                  </button>
+                )}
+              </div>
+              <p className="mt-2 px-1 text-[10px] text-slate-500">
+                Enter to send · Shift+Enter newline · tools run server-side via free public APIs
+              </p>
+            </form>
+          </div>
+        </section>
+
+        {/* left rail — second on mobile */}
+        <aside className="order-2 lg:order-1 lg:col-span-4 xl:col-span-3">
+          <RepoPanel onSuggest={suggest} />
+        </aside>
       </main>
     </div>
   );
