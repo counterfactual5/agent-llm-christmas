@@ -3,39 +3,40 @@ import OpenAI from 'openai';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = `You are the Web3 & DeFi Agent on agent.llm.christmas, a public showcase of open-source DeFi/agent tooling by github.com/counterfactual5.
+const TOOL_BASE_URL = (process.env.TOOL_BRIDGE_BASE_URL || 'https://cpa.llm.christmas/tools').replace(/\/$/, '');
 
-You have live Web3 tools powered by VPS microservices:
-- polymarket_search: Search prediction markets & real-time odds on Polymarket via polymarket-sdk
-- uniswap_quote: Query swap paths & price impact via uni-exec-engine
-- hyperliquid_snapshot: Query perps open interest, mark price & funding rate via hl-trade-flow
-- defi_doctor: Check health & risk metrics of lending/staking protocols via defi-omni-cli
-- get_token_price: live USD prices (CoinGecko)
-- get_defi_tvl: protocol TVL (DefiLlama)
-- get_github_repo: GitHub repo stats
+const SYSTEM_PROMPT = `You are the Web3 & DeFi Agent on agent.llm.christmas, a public showcase of open-source tooling by github.com/counterfactual5.
 
-Use tools for price/TVL/prediction/gas/repo questions. Always cite the data source. For everything else answer from your knowledge. Format in Markdown. Be concise and helpful.`;
+The tools call published Python packages running on a read-only VPS bridge:
+- uniswap_quote_plan: uni-exec-engine resolves tokens and builds the real Uniswap Trading API request payload. It is a request plan, not an executed quote, unless execution.available is true.
+- uniswap_il: uni-exec-engine calculates concentrated-liquidity impermanent loss.
+- uniswap_range_model: uni-exec-engine calculates LP tick-range profiles.
+- polymarket_search: polymarket-sdk searches live prediction markets.
+- polymarket_market_snapshot: polymarket-sdk resolves an outcome token, fetches its live CLOB book/mid/spread, and validates whether the snapshot is tradeable.
+- hyperliquid_quote: hl-trade-flow walks the live L2 book and estimates fill price, size, slippage, cost, and depth after validating the snapshot.
+- defi_doctor: defi-omni-cli performs real RPC, chain-id, gas, wallet, and optional policy preflight checks. It does not return protocol TVL or fabricated health factors.
+- get_token_price, get_defi_tvl, get_github_repo, get_gas_price: public reference-data tools.
+
+Rules:
+- Never invent route, output amount, price impact, TVL, health factor, or execution status.
+- Clearly distinguish an indicative price, a request plan, a simulated calculation, and an executable venue quote.
+- If a tool reports execution.available=false, say that a Uniswap API key is required for the final Trading API quote.
+- Cite the exact package/tool source. Format in concise Markdown.`;
 
 const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
-      name: 'polymarket_search',
-      description: 'Search prediction markets, outcome prices, and volume on Polymarket via polymarket-sdk.',
-      parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search keyword, e.g. "election", "btc", "fed".' } }, required: ['query'] },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'uniswap_quote',
-      description: 'Get automated swap quotes, price impact, and path routing on Uniswap via uni-exec-engine.',
+      name: 'uniswap_quote_plan',
+      description: 'Use uni-exec-engine to resolve tokens and construct a real Uniswap Trading API quote request without inventing an output amount.',
       parameters: {
         type: 'object',
         properties: {
-          token_in: { type: 'string', description: 'Input token symbol, e.g. "ETH"' },
-          token_out: { type: 'string', description: 'Output token symbol, e.g. "USDC"' },
-          amount_in: { type: 'number', description: 'Amount of input token' },
+          token_in: { type: 'string', description: 'Input token symbol or address, e.g. ETH.' },
+          token_out: { type: 'string', description: 'Output token symbol or address, e.g. USDC.' },
+          amount_in: { type: 'string', description: 'Human-readable input amount.' },
+          chain: { type: 'string', description: 'Chain name, default ethereum.' },
+          slippage_pct: { type: 'number', description: 'Maximum slippage percentage, default 0.5.' },
         },
         required: ['token_in', 'token_out', 'amount_in'],
       },
@@ -44,97 +45,201 @@ const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
-      name: 'hyperliquid_snapshot',
-      description: 'Get perpetual futures market snapshot (funding rate, mark price, open interest) via hl-trade-flow.',
-      parameters: { type: 'object', properties: { symbol: { type: 'string', description: 'Ticker symbol, e.g. "BTC" or "ETH".' } }, required: ['symbol'] },
+      name: 'uniswap_il',
+      description: 'Calculate Uniswap V3 concentrated-liquidity impermanent loss via uni-exec-engine.',
+      parameters: {
+        type: 'object',
+        properties: {
+          price_entry: { type: 'number' }, price_current: { type: 'number' },
+          tick_lower: { type: 'integer' }, tick_upper: { type: 'integer' },
+          decimals0: { type: 'integer', default: 18 }, decimals1: { type: 'integer', default: 6 },
+          liquidity: { type: 'integer', default: 1000000000000000000 },
+        },
+        required: ['price_entry', 'price_current', 'tick_lower', 'tick_upper'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'uniswap_range_model',
+      description: 'Generate conservative, moderate, and aggressive LP ranges via uni-exec-engine.',
+      parameters: {
+        type: 'object',
+        properties: {
+          current_tick: { type: 'integer' }, tick_spacing: { type: 'integer' },
+          decimals0: { type: 'integer', default: 18 }, decimals1: { type: 'integer', default: 6 },
+          pair_type: { type: 'string', enum: ['stable_stable', 'correlated', 'major_volatile', 'volatile'] },
+          price_change_24h: { type: 'number' },
+        },
+        required: ['current_tick', 'tick_spacing', 'pair_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'polymarket_search',
+      description: 'Search live Polymarket events and markets via polymarket-sdk.',
+      parameters: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'integer', default: 5 } }, required: ['query'] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'polymarket_market_snapshot',
+      description: 'Fetch and validate a live Polymarket outcome-token order book via polymarket-sdk.',
+      parameters: {
+        type: 'object',
+        properties: {
+          market: { type: 'string', description: 'Market slug or id.' },
+          outcome_index: { type: 'integer', default: 0 },
+          max_spread: { type: 'number', default: 0.1 },
+        },
+        required: ['market'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'hyperliquid_quote',
+      description: 'Walk the live Hyperliquid L2 book and calculate an estimated fill via hl-trade-flow.',
+      parameters: {
+        type: 'object',
+        properties: {
+          coin: { type: 'string', description: 'BTC, ETH, etc.' },
+          side: { type: 'string', enum: ['buy', 'sell'] },
+          size_usd: { type: 'number' },
+          max_slippage_pct: { type: 'number', default: 0.5 },
+        },
+        required: ['coin', 'side', 'size_usd'],
+      },
     },
   },
   {
     type: 'function',
     function: {
       name: 'defi_doctor',
-      description: 'Run health factor and risk diagnostic checks across DeFi protocols via defi-omni-cli.',
-      parameters: { type: 'object', properties: { protocol: { type: 'string', description: 'Protocol name, e.g. "aave", "compound", "morpho".' } } },
+      description: 'Run a read-only chain/RPC/gas/wallet/policy preflight via defi-omni-cli.',
+      parameters: {
+        type: 'object',
+        properties: {
+          chain_id: { type: 'integer', default: 1 }, wallet: { type: 'string' },
+          policy_check: { type: 'boolean', default: false }, amount: { type: 'string' },
+        },
+      },
     },
   },
   {
     type: 'function',
     function: {
       name: 'get_token_price',
-      description: 'Get USD price and 24h change via CoinGecko.',
-      parameters: { type: 'object', properties: { ids: { type: 'string', description: 'Comma-separated CoinGecko ids, e.g. "ethereum,bitcoin".' } }, required: ['ids'] },
+      description: 'Get current USD prices and 24h changes via CoinGecko.',
+      parameters: { type: 'object', properties: { ids: { type: 'string', description: 'Comma-separated CoinGecko ids.' } }, required: ['ids'] },
     },
   },
   {
     type: 'function',
     function: {
       name: 'get_defi_tvl',
-      description: 'Get TVL via DefiLlama.',
-      parameters: { type: 'object', properties: { protocol: { type: 'string', description: 'Protocol slug, e.g. "uniswap".' } }, required: ['protocol'] },
+      description: 'Get protocol TVL via DefiLlama.',
+      parameters: { type: 'object', properties: { protocol: { type: 'string' } }, required: ['protocol'] },
     },
   },
   {
     type: 'function',
     function: {
       name: 'get_github_repo',
-      description: 'Get GitHub repo stats.',
-      parameters: { type: 'object', properties: { repo: { type: 'string', description: 'owner/name, e.g. "counterfactual5/uni-exec-engine".' } }, required: ['repo'] },
+      description: 'Get GitHub repository stats.',
+      parameters: { type: 'object', properties: { repo: { type: 'string' } }, required: ['repo'] },
     },
   },
   {
     type: 'function',
     function: {
       name: 'get_gas_price',
-      description: 'Current Ethereum gas price in gwei.',
+      description: 'Get the current Ethereum gas oracle result.',
       parameters: { type: 'object', properties: {} },
     },
   },
 ];
 
-const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 15_000;
 async function fetchJson(url: string, init: RequestInit = {}): Promise<any> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, { ...init, signal: ctrl.signal });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return await res.json();
+    const body = await res.text();
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
+    return body ? JSON.parse(body) : null;
   } finally {
-    clearTimeout(t);
+    clearTimeout(timer);
   }
+}
+
+async function postTool(path: string, body: Record<string, unknown>) {
+  return fetchJson(`${TOOL_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 async function executeTool(name: string, args: any): Promise<string> {
   try {
+    if (name === 'uniswap_quote_plan') {
+      const data = await postTool('/uniswap/quote-plan', {
+        token_in: args.token_in || 'ETH', token_out: args.token_out || 'USDC',
+        amount_in: String(args.amount_in || '1'), chain: args.chain || 'ethereum',
+        slippage_pct: Number(args.slippage_pct ?? 0.5),
+      });
+      return JSON.stringify({ source: 'uni-exec-engine.prepare_quote_request_data', data });
+    }
+    if (name === 'uniswap_il') {
+      const data = await postTool('/uniswap/il', args);
+      return JSON.stringify({ source: 'uni-exec-engine.calculate_il', data });
+    }
+    if (name === 'uniswap_range_model') {
+      const data = await postTool('/uniswap/range-model', args);
+      return JSON.stringify({ source: 'uni-exec-engine.calculate_range_suggestions', data });
+    }
     if (name === 'polymarket_search') {
       const q = String(args.query || args.q || '').trim();
-      const data = await fetchJson(`https://cpa.llm.christmas/tools/polymarket/search?q=${encodeURIComponent(q)}`);
-      return JSON.stringify({ source: 'Polymarket (polymarket-sdk)', data });
+      const limit = Number(args.limit || 5);
+      const data = await fetchJson(`${TOOL_BASE_URL}/polymarket/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+      return JSON.stringify({ source: 'polymarket-sdk.search', data });
     }
-    if (name === 'uniswap_quote') {
-      const data = await fetchJson('https://cpa.llm.christmas/tools/uniswap/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token_in: args.token_in || 'ETH',
-          token_out: args.token_out || 'USDC',
-          amount_in: Number(args.amount_in || 1),
-        }),
+    if (name === 'polymarket_market_snapshot') {
+      const params = new URLSearchParams({
+        market: String(args.market || ''), outcome_index: String(args.outcome_index ?? 0),
+        max_spread: String(args.max_spread ?? 0.1),
       });
-      return JSON.stringify({ source: 'Uniswap (uni-exec-engine)', data });
+      const data = await fetchJson(`${TOOL_BASE_URL}/polymarket/market-snapshot?${params}`);
+      return JSON.stringify({ source: 'polymarket-sdk orderbook + snapshot validator', data });
     }
-    if (name === 'hyperliquid_snapshot') {
-      const symbol = String(args.symbol || 'BTC').trim();
-      const data = await fetchJson(`https://cpa.llm.christmas/tools/hyperliquid/snapshot?symbol=${encodeURIComponent(symbol)}`);
-      return JSON.stringify({ source: 'Hyperliquid (hl-trade-flow)', data });
+    if (name === 'hyperliquid_quote') {
+      const params = new URLSearchParams({
+        coin: String(args.coin || args.symbol || 'BTC'), side: String(args.side || 'buy'),
+        size_usd: String(args.size_usd || 100), max_slippage_pct: String(args.max_slippage_pct ?? 0.5),
+      });
+      const data = await fetchJson(`${TOOL_BASE_URL}/hyperliquid/quote?${params}`);
+      return JSON.stringify({ source: 'hl-trade-flow.prepare_quote', data });
     }
     if (name === 'defi_doctor') {
-      const protocol = String(args.protocol || 'aave').trim();
-      const data = await fetchJson(`https://cpa.llm.christmas/tools/defi/doctor?protocol=${encodeURIComponent(protocol)}`);
-      return JSON.stringify({ source: 'DeFi Omni Doctor (defi-omni-cli)', data });
+      const params = new URLSearchParams({
+        chain_id: String(args.chain_id || 1), policy_check: String(Boolean(args.policy_check)),
+      });
+      if (args.wallet) params.set('wallet', String(args.wallet));
+      if (args.amount) params.set('amount', String(args.amount));
+      const data = await fetchJson(`${TOOL_BASE_URL}/defi/doctor?${params}`);
+      return JSON.stringify({ source: 'defi-omni-cli.run_doctor', data });
     }
     if (name === 'get_token_price') {
-      const ids = String(args.ids || '').trim();
+      const raw = String(args.ids || args.token || '').trim();
+      const aliases: Record<string, string> = { eth: 'ethereum', ethereum: 'ethereum', btc: 'bitcoin', bitcoin: 'bitcoin', sol: 'solana' };
+      const ids = raw.split(',').map((v) => aliases[v.trim().toLowerCase()] || v.trim()).filter(Boolean).join(',');
       const data = await fetchJson(`https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`);
       return JSON.stringify({ source: 'CoinGecko', data });
     }
@@ -145,7 +250,7 @@ async function executeTool(name: string, args: any): Promise<string> {
     }
     if (name === 'get_github_repo') {
       const repo = String(args.repo || '').trim();
-      const data = await fetchJson(`https://api.github.com/repos/${encodeURIComponent(repo)}`);
+      const data = await fetchJson(`https://api.github.com/repos/${repo.split('/').map(encodeURIComponent).join('/')}`);
       return JSON.stringify({ source: 'GitHub', name: data.full_name, stars: data.stargazers_count, forks: data.forks_count, language: data.language, description: data.description, url: data.html_url });
     }
     if (name === 'get_gas_price') {
@@ -154,36 +259,55 @@ async function executeTool(name: string, args: any): Promise<string> {
     }
     return JSON.stringify({ error: `unknown tool: ${name}` });
   } catch (err: any) {
-    return JSON.stringify({ error: String(err?.message || err) });
+    return JSON.stringify({ error: String(err?.message || err), tool: name });
   }
+}
+
+function parseValue(value: string, stringFlag?: string): unknown {
+  const clean = value.trim();
+  if (stringFlag === 'true') return clean;
+  if (/^-?\d+(\.\d+)?$/.test(clean)) return Number(clean);
+  if (clean === 'true') return true;
+  if (clean === 'false') return false;
+  return clean;
+}
+
+function parseDsmlToolCalls(content: string): any[] {
+  if (!content || !/[<]?[｜|]DSML[｜|]/i.test(content)) return [];
+  const calls: any[] = [];
+  const invokeRe = /<[｜|]DSML[｜|]invoke\s+name=["']([^"']+)["'][^>]*>([\s\S]*?)<\/[｜|]DSML[｜|]invoke>/gi;
+  let invoke: RegExpExecArray | null;
+  while ((invoke = invokeRe.exec(content))) {
+    const args: Record<string, unknown> = {};
+    const paramRe = /<[｜|]DSML[｜|]parameter\s+name=["']([^"']+)["'](?:\s+string=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/[｜|]DSML[｜|]parameter>/gi;
+    let param: RegExpExecArray | null;
+    while ((param = paramRe.exec(invoke[2]))) args[param[1]] = parseValue(param[3], param[2]);
+    calls.push({ id: `dsml_${calls.length}_${Date.now()}`, type: 'function', function: { name: invoke[1], arguments: JSON.stringify(args) } });
+  }
+  return calls;
+}
+
+function stripInternalToolSyntax(text: string): string {
+  return text
+    .replace(/<[｜|]DSML[｜|]tool_calls>[\s\S]*?<\/[｜|]DSML[｜|]tool_calls>/gi, '')
+    .replace(/<[｜|]DSML[｜|][^>]*>/gi, '')
+    .replace(/<\/[｜|]DSML[｜|][^>]*>/gi, '')
+    .trim();
 }
 
 function jsonError(message: string, status = 500) {
   return new Response(JSON.stringify({ error: message }), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
-/**
- * Build an AI-SDK v3 protocol stream from scratch (no OpenAIStream parser).
- * The frontend `useChat` hook accepts:
- *   - "0:<json-string>" → text delta
- *   - "d:<json-string>" → finish metadata
- *   - custom annotations for tool events
- */
 function aiSdkV3TextStream(chunks: AsyncIterable<string>): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
       try {
-        for await (const c of chunks) {
-          if (!c) continue;
-          controller.enqueue(encoder.encode(`0:${JSON.stringify(c)}\n`));
-        }
+        for await (const chunk of chunks) if (chunk) controller.enqueue(encoder.encode(`0:${JSON.stringify(chunk)}\n`));
         controller.enqueue(encoder.encode(`d:${JSON.stringify({ finishReason: 'stop' })}\n`));
-      } catch (e) {
-        // Send a finish marker with an error annotation so the UI can show it
-        controller.enqueue(
-          encoder.encode(`d:${JSON.stringify({ finishReason: 'error', error: String((e as any)?.message || e) })}\n`)
-        );
+      } catch (error) {
+        controller.enqueue(encoder.encode(`d:${JSON.stringify({ finishReason: 'error', error: String((error as any)?.message || error) })}\n`));
       } finally {
         controller.close();
       }
@@ -191,98 +315,65 @@ function aiSdkV3TextStream(chunks: AsyncIterable<string>): ReadableStream<Uint8A
   });
 }
 
+async function* chunkText(text: string) {
+  for (const chunk of text.match(/[\s\S]{1,48}/g) || [text]) {
+    yield chunk;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { messages, model = 'deepseek-v4-flash-200k' } = await req.json();
-
     const apiKey = process.env.LLM_CHRISTMAS_API_KEY || process.env.OPENAI_API_KEY || '';
     const baseURL = (process.env.LLM_CHRISTMAS_BASE_URL || 'https://api.llm.christmas/v1').replace(/\/$/, '');
-
     if (!apiKey) return jsonError('Missing LLM_CHRISTMAS_API_KEY in Vercel environment variables.');
     if (!Array.isArray(messages)) return jsonError('Invalid request: messages must be an array.', 400);
 
     const openai = new OpenAI({ apiKey, baseURL });
-    const baseMessages = [{ role: 'system', content: SYSTEM_PROMPT }, ...messages];
-
-    // Phase 1: non-streaming — decide tool calls
-    const first = await openai.chat.completions.create({
-      model,
-      stream: false,
-      messages: baseMessages,
-      tools: TOOL_DEFINITIONS as any,
-      tool_choice: 'auto',
+    const baseMessages: any[] = [{ role: 'system', content: SYSTEM_PROMPT }, ...messages];
+    const first: any = await openai.chat.completions.create({
+      model, stream: false, messages: baseMessages, tools: TOOL_DEFINITIONS as any, tool_choice: 'auto',
     } as any);
-    const firstChoice: any = (first as any).choices?.[0];
-    const firstMsg = firstChoice?.message;
-    const toolCalls: any[] = firstMsg?.tool_calls || [];
+    const firstMsg: any = first.choices?.[0]?.message || {};
+    let toolCalls: any[] = firstMsg.tool_calls || [];
+    if (toolCalls.length === 0) toolCalls = parseDsmlToolCalls(String(firstMsg.content || ''));
 
     if (toolCalls.length === 0) {
-      // No tools requested — stream the (already complete) assistant text by chunking.
-      const text: string = firstMsg?.content || '';
-      const chunks = text.match(/.{1,40}/g) || [text];
-      const data: string[] = chunks.length > 0 ? chunks : [''];
-      return new Response(aiSdkV3TextStream((async function* () {
-        for (const c of data) {
-          yield c;
-          await new Promise((r) => setTimeout(r, 8));
-        }
-      })()), {
+      const text = stripInternalToolSyntax(String(firstMsg.content || '')) || 'The model returned no displayable response.';
+      return new Response(aiSdkV3TextStream(chunkText(text)), {
         headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Vercel-AI-Data-Stream': 'v1' },
       });
     }
 
-    // Tools requested — run them, then stream a 2nd call for the final answer.
-    const conversation: any[] = [...baseMessages, firstMsg];
-
+    const assistantToolMessage = { role: 'assistant', content: null, tool_calls: toolCalls };
+    const conversation: any[] = [...baseMessages, assistantToolMessage];
     for (const call of toolCalls) {
-      const toolName = call.function?.name;
       let toolArgs: any = {};
-      try {
-        toolArgs = JSON.parse(call.function?.arguments || '{}');
-      } catch {
-        toolArgs = {};
-      }
-      const result = await executeTool(toolName, toolArgs);
+      try { toolArgs = JSON.parse(call.function?.arguments || '{}'); } catch { toolArgs = {}; }
+      const result = await executeTool(call.function?.name, toolArgs);
       conversation.push({ role: 'tool', tool_call_id: call.id, content: result });
     }
+    conversation.push({
+      role: 'system',
+      content: 'Tool execution is complete. Answer only from the supplied tool results. Do not emit or request DSML/tool_calls. If a tool failed or returned a plan rather than a quote, state that plainly.',
+    });
 
-    // Phase 2: streaming final answer (no tools param so model answers in prose)
-    const response = await openai.chat.completions.create({
-      model,
-      stream: true,
-      messages: conversation,
-    } as any);
-
-    return new Response(aiSdkV3TextStream(toTextStream(response as any)), {
+    const response = await openai.chat.completions.create({ model, stream: true, messages: conversation } as any);
+    return new Response(aiSdkV3TextStream(toCleanTextStream(response as any)), {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'X-Vercel-AI-Data-Stream': 'v1' },
     });
   } catch (err: any) {
     console.error('chat route error:', err);
     const status = err?.status || err?.statusCode || err?.response?.status;
-    const detail = err?.error?.message || err?.message || (typeof err === 'string' ? err : null) || 'Upstream model request failed.';
-    let hint = '';
-    if (status === 401 || /invalid token|unauthorized|api key/i.test(String(detail))) {
-      hint = ' API key rejected — use a valid llm.christmas / new-api token (sk-...).';
-    } else if (status === 404 || /model/i.test(String(detail))) {
-      hint = ' Model id may not exist on this gateway — pick an id from the dropdown catalog.';
-    } else if (status === 502 || /502|bad gateway|ECONNREFUSED/i.test(String(detail))) {
-      hint = ' Gateway 502 — try BASE_URL https://api.llm.christmas/v1 (new-api).';
-    }
-    return jsonError(`${detail}${status ? ` (HTTP ${status})` : ''}.${hint}`);
+    const detail = err?.error?.message || err?.message || String(err || 'Upstream model request failed.');
+    return jsonError(`${detail}${status ? ` (HTTP ${status})` : ''}`);
   }
 }
 
-
-async function* toTextStream(response: any) {
-  for await (const chunk of response) {
-    const delta = chunk?.choices?.[0]?.delta?.content;
-    if (delta) {
-      // DeepSeek models sometimes leak their internal tool-calling tokens
-      // like `<｜DSML｜tool_calls｜>` or `<｜tool calls｜>`. Filter them out.
-      const cleanedDelta = delta
-        .replace(/<｜.*?｜>/g, '')
-        .replace(/<\|.*?\|>/g, '');
-      if (cleanedDelta) yield cleanedDelta;
-    }
-  }
+async function* toCleanTextStream(response: any) {
+  let raw = '';
+  for await (const chunk of response) raw += chunk?.choices?.[0]?.delta?.content || '';
+  const clean = stripInternalToolSyntax(raw) || 'The model returned no displayable response.';
+  yield* chunkText(clean);
 }

@@ -26,7 +26,7 @@ const REPOS = [
     url: 'https://github.com/counterfactual5/uni-exec-engine',
     badge: 'Python',
     icon: <Database className="w-4 h-4 text-indigo-500" />,
-    demoPrompt: "What is the current GitHub repo stats for 'counterfactual5/uni-exec-engine'?",
+    demoPrompt: "Use uni-exec-engine to build a quote request plan for swapping 1 ETH to USDC on Ethereum. Do not invent an output amount.",
   },
   {
     name: 'defi-omni-cli',
@@ -35,7 +35,7 @@ const REPOS = [
     url: 'https://github.com/counterfactual5/defi-omni-cli',
     badge: 'Python',
     icon: <TerminalSquare className="w-4 h-4 text-rose-500" />,
-    demoPrompt: "Explain how a unified CLI for multiple DeFi protocols like Morpho and Moonwell improves execution efficiency.",
+    demoPrompt: "Run the defi-omni-cli doctor on Ethereum mainnet and explain each RPC and gas preflight check.",
   },
   {
     name: 'hl-trade-flow',
@@ -44,16 +44,16 @@ const REPOS = [
     url: 'https://github.com/counterfactual5/hl-trade-flow',
     badge: 'Python',
     icon: <Activity className="w-4 h-4 text-emerald-500" />,
-    demoPrompt: "What are the common risks in trading perpetual futures on a DEX like Hyperliquid?",
+    demoPrompt: "Use hl-trade-flow to estimate a $10,000 BTC buy from the live Hyperliquid L2 book with a 0.5% slippage limit.",
   },
   {
-    name: 'polymarket-py',
+    name: 'polymarket-sdk',
     tag: 'Prediction Market SDK',
     desc: 'The Python client Polymarket never shipped: zero-dep market data + CLOB trading (EIP-191).',
-    url: 'https://github.com/counterfactual5/polymarket-py',
+    url: 'https://github.com/counterfactual5/polymarket-sdk',
     badge: 'Python',
     icon: <Network className="w-4 h-4 text-amber-500" />,
-    demoPrompt: "Fetch the Polymarket prediction odds for 'Election' or 'Bitcoin'.",
+    demoPrompt: "Use polymarket-sdk to search for active Bitcoin prediction markets and summarize their live outcome prices.",
   },
 ];
 
@@ -105,7 +105,7 @@ export default function AgentPage() {
                 </span>
               </h1>
               <p className="text-[11px] text-slate-500 font-medium">
-                Web3 agent demo with built-in price / TVL / repo / gas tools
+                Live package tools: order books, LP risk, RPC preflight, and market validation
               </p>
             </div>
           </div>
@@ -213,29 +213,29 @@ export default function AgentPage() {
                 </div>
                 <h2 className="text-lg font-bold text-slate-800 tracking-tight">Web3 Agent with Live Built-in Tools</h2>
                 <p className="mt-2 max-w-md text-sm text-slate-500 leading-relaxed">
-                  The agent calls free public APIs mid-chat — prices, TVL, repo stats, gas. Tool calls show up as annotations in the console. Try one:
+                  The agent invokes the published Python packages on a read-only VPS bridge. Try a real package workflow:
                 </p>
                 <div className="mt-8 grid w-full max-w-xl grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
-                    onClick={() => setInput("What is the current price of ETH and BTC? Include the 24h change.")}
+                    onClick={() => setInput("Use hl-trade-flow to estimate a $10,000 BTC buy from the live Hyperliquid L2 book with a 0.5% slippage limit.")}
                     className="flex flex-col text-left rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-[0_4px_20px_rgba(37,99,235,0.06)]"
                   >
-                    <span className="text-xs font-bold text-slate-700 mb-1">Live token prices</span>
-                    <span className="text-[11px] text-slate-500 leading-relaxed">What is the current price of ETH and BTC? Include the 24h change.</span>
+                    <span className="text-xs font-bold text-slate-700 mb-1">L2 execution quote</span>
+                    <span className="text-[11px] text-slate-500 leading-relaxed">Walk Hyperliquid's live book and calculate fill price, depth, and slippage.</span>
                   </button>
                   <button
-                    onClick={() => setInput("What is Uniswap's current TVL? Break it down by chain.")}
+                    onClick={() => setInput("Use uni-exec-engine to build a quote request plan for swapping 1 ETH to USDC on Ethereum. Do not invent an output amount.")}
                     className="flex flex-col text-left rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-[0_4px_20px_rgba(37,99,235,0.06)]"
                   >
-                    <span className="text-xs font-bold text-slate-700 mb-1">Uniswap TVL</span>
-                    <span className="text-[11px] text-slate-500 leading-relaxed">What is Uniswap's current TVL? Break it down by chain.</span>
+                    <span className="text-xs font-bold text-slate-700 mb-1">Uniswap request plan</span>
+                    <span className="text-[11px] text-slate-500 leading-relaxed">Resolve tokens and construct the real Trading API payload without fake output.</span>
                   </button>
                   <button
-                    onClick={() => setInput("What is Ethereum gas right now? Is it a good time to transact?")}
+                    onClick={() => setInput("Run the defi-omni-cli doctor on Ethereum mainnet and explain each RPC and gas preflight check.")}
                     className="flex flex-col text-left rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-[0_4px_20px_rgba(37,99,235,0.06)] sm:col-span-2"
                   >
-                    <span className="text-xs font-bold text-slate-700 mb-1">Gas check</span>
-                    <span className="text-[11px] text-slate-500 leading-relaxed">What is Ethereum gas right now? Is it a good time to transact?</span>
+                    <span className="text-xs font-bold text-slate-700 mb-1">DeFi execution preflight</span>
+                    <span className="text-[11px] text-slate-500 leading-relaxed">Use defi-omni-cli to verify the chain, RPC, signer state, balance, and gas.</span>
                   </button>
                 </div>
               </div>
