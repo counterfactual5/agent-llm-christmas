@@ -84,8 +84,6 @@ const MODELS = [
   { id: 'minimax-m3-free', label: 'MiniMax M3 Free' },
   { id: 'mimo-v2.5-free', label: 'MiMo V2.5 Free' },
   { id: 'nemotron-3-ultra-free', label: 'Nemotron 3 Ultra Free' },
-  { id: 'north-mini-code-free', label: 'North Mini Code Free' },
-  { id: 'hy3-free', label: 'Hunyuan Hy3 Free' },
   { id: 'cursor-auto', label: 'Cursor Auto' },
 ];
 
