@@ -75,13 +75,18 @@ const REPOS = [
   },
 ];
 
+/** Free models on llm.christmas (model_ratio=0 or id ends with -free). Source: /api/pricing */
 const MODELS = [
   { id: 'deepseek-v4-flash-200k', label: 'DeepSeek V4 Flash 200K' },
   { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
   { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-  { id: 'glm-5.2', label: 'GLM 5.2' },
-  { id: 'mistral-large-latest', label: 'Mistral Large' },
-  { id: 'minimax-m3', label: 'MiniMax M3' },
+  { id: 'glm-5.2-free', label: 'GLM 5.2 Free' },
+  { id: 'minimax-m3-free', label: 'MiniMax M3 Free' },
+  { id: 'mimo-v2.5-free', label: 'MiMo V2.5 Free' },
+  { id: 'nemotron-3-ultra-free', label: 'Nemotron 3 Ultra Free' },
+  { id: 'north-mini-code-free', label: 'North Mini Code Free' },
+  { id: 'hy3-free', label: 'Hunyuan Hy3 Free' },
+  { id: 'cursor-auto', label: 'Cursor Auto' },
 ];
 
 export default function AgentPage() {
