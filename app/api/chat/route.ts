@@ -8,7 +8,8 @@ const TOOL_BASE_URL = (process.env.TOOL_BRIDGE_BASE_URL || 'https://tools.defiag
 const SYSTEM_PROMPT = `You are DeFi Agent (defiagent.llm.christmas), a public showcase of open-source Web3 tooling by github.com/counterfactual5.
 
 The tools call published Python packages running on a read-only VPS bridge:
-- uniswap_quote_plan: uni-exec-engine resolves tokens and builds the real Uniswap Trading API request payload. It is a request plan, not an executed quote, unless execution.available is true.
+- uniswap_quote_plan: uni-exec-engine resolves tokens, builds the Trading API plan / live reference price, and always attaches an app.uniswap.org deep link (uniswap-ai style) under deepLink / execution_links.uniswap_app for the user to open and sign.
+- uniswap_swap_link: build only the prefilled Uniswap app deep link when the user just wants an execute link.
 - uniswap_il: uni-exec-engine calculates concentrated-liquidity impermanent loss.
 - uniswap_range_model: uni-exec-engine calculates LP tick-range profiles.
 - polymarket_search: polymarket-sdk searches live prediction markets.
@@ -23,7 +24,9 @@ The tools call published Python packages running on a read-only VPS bridge:
 Rules:
 - Never invent route, output amount, price impact, TVL, health factor, or execution status.
 - Clearly distinguish an indicative price, a request plan, a simulated calculation, and an executable venue quote.
-- If a tool reports execution.available=false, say that a Uniswap API key is required for the final Trading API quote.
+- When a tool returns deepLink or execution_links.uniswap_app, always show it as a Markdown link (e.g. [Open in Uniswap](url)) and state that the user must review and sign in their own wallet — this agent does not broadcast swaps.
+- Prefer uniswap-ai style: quote/plan + deep link. Full automated sign/broadcast stays off the public bridge (read-only).
+- If a tool reports execution.available=false for Trading API live quote, still present the deep link when available; only mention the API key gap if the user asked for a signed/server-side route.
 - Cite the exact package/tool source. Format in concise Markdown.`;
 
 const TOOL_DEFINITIONS = [
@@ -31,7 +34,7 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'uniswap_quote_plan',
-      description: 'Use uni-exec-engine to construct a real Uniswap Trading API payload AND read the live V3 pool price on-chain. Returns the request plan, a coingecko indicative price (via the package price_feed) and, when the VPS public RPC allows it, the live V3 pool mid price.',
+      description: 'Use uni-exec-engine to build a Uniswap quote/plan, read live reference prices, and return an app.uniswap.org deep link (deepLink / execution_links) so the user can open Uniswap and sign. Complements uniswap-ai style linking with real package-backed pricing.',
       parameters: {
         type: 'object',
         properties: {
@@ -40,6 +43,23 @@ const TOOL_DEFINITIONS = [
           amount_in: { type: 'string', description: 'Human-readable input amount, e.g. "1".' },
           chain: { type: 'string', description: 'Chain name, default ethereum.' },
           slippage_pct: { type: 'number', description: 'Maximum slippage percentage, default 0.5.' },
+        },
+        required: ['token_in', 'token_out', 'amount_in'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'uniswap_swap_link',
+      description: 'Build a prefilled app.uniswap.org swap deep link (official uniswap-ai style). User opens the link and signs in their wallet. No broadcast by the agent.',
+      parameters: {
+        type: 'object',
+        properties: {
+          token_in: { type: 'string', description: 'Input token symbol or address, e.g. "ETH".' },
+          token_out: { type: 'string', description: 'Output token symbol or address, e.g. "USDC".' },
+          amount_in: { type: 'string', description: 'Human-readable input amount, e.g. "1".' },
+          chain: { type: 'string', description: 'Chain name, default ethereum.' },
         },
         required: ['token_in', 'token_out', 'amount_in'],
       },
@@ -250,7 +270,24 @@ async function executeTool(name: string, args: any): Promise<string> {
         amount_in: String(args.amount_in || '1'), chain: args.chain || 'ethereum',
         slippage_pct: Number(args.slippage_pct ?? 0.5),
       });
-      return JSON.stringify({ source: 'uni-exec-engine.prepare_quote_request_data', data });
+      return JSON.stringify({
+        source: 'uni-exec-engine.prepare_quote_request_data + deep_link',
+        data,
+        deepLink: data?.deepLink || data?.execution_links?.uniswap_app || null,
+      });
+    }
+    if (name === 'uniswap_swap_link') {
+      const data = await postTool('/uniswap/swap-link', {
+        token_in: args.token_in || 'ETH',
+        token_out: args.token_out || 'USDC',
+        amount_in: String(args.amount_in || '1'),
+        chain: args.chain || 'ethereum',
+      });
+      return JSON.stringify({
+        source: 'uni-exec-engine.swap.links.deep_link',
+        data,
+        deepLink: data?.deepLink || data?.execution_links?.uniswap_app || null,
+      });
     }
     if (name === 'uniswap_il') {
       const data = await postTool('/uniswap/il', args);
