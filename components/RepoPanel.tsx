@@ -32,7 +32,7 @@ const LIVE_TOOLS = [
   {
     name: 'get_gas_price',
     label: 'Gas Price',
-    source: 'Ethereum RPC',
+    source: 'tools.defiagent · Etherscan V2',
     sample: 'What is Ethereum gas right now? Is it a good time to transact?',
   },
 ];

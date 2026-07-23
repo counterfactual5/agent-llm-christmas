@@ -2,8 +2,8 @@ import './globals.css'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'agent.llm.christmas — Web3 & DeFi Agent',
-  description: 'Modern agent showcase powered by llm.christmas gateway and OSS execution engines',
+  title: 'DeFi Agent — Live Web3 Tools',
+  description: 'DeFi Agent showcase on defiagent.llm.christmas — live package tools via tools.defiagent.llm.christmas',
 }
 
 export default function RootLayout({

@@ -3,9 +3,9 @@ import OpenAI from 'openai';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const TOOL_BASE_URL = (process.env.TOOL_BRIDGE_BASE_URL || 'https://cpa.llm.christmas/tools').replace(/\/$/, '');
+const TOOL_BASE_URL = (process.env.TOOL_BRIDGE_BASE_URL || 'https://tools.defiagent.llm.christmas/tools').replace(/\/$/, '');
 
-const SYSTEM_PROMPT = `You are the Web3 & DeFi Agent on agent.llm.christmas, a public showcase of open-source tooling by github.com/counterfactual5.
+const SYSTEM_PROMPT = `You are DeFi Agent (defiagent.llm.christmas), a public showcase of open-source Web3 tooling by github.com/counterfactual5.
 
 The tools call published Python packages running on a read-only VPS bridge:
 - uniswap_quote_plan: uni-exec-engine resolves tokens and builds the real Uniswap Trading API request payload. It is a request plan, not an executed quote, unless execution.available is true.
@@ -208,8 +208,14 @@ const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'get_gas_price',
-      description: 'Get the current Ethereum gas oracle result.',
-      parameters: { type: 'object', properties: {} },
+      description: 'Get current gas prices via DeFi Agent tool-bridge (Etherscan API V2 gasoracle).',
+      parameters: {
+        type: 'object',
+        properties: {
+          chain: { type: 'string', description: 'ethereum/base/arbitrum/optimism/polygon', default: 'ethereum' },
+          speed: { type: 'string', description: 'slow/standard/fast', default: 'standard' },
+        },
+      },
     },
   },
 ];
@@ -319,8 +325,31 @@ async function executeTool(name: string, args: any): Promise<string> {
       return JSON.stringify({ source: 'GitHub', name: data.full_name, stars: data.stargazers_count, forks: data.forks_count, language: data.language, description: data.description, url: data.html_url });
     }
     if (name === 'get_gas_price') {
-      const data = await fetchJson('https://api.etherscan.io/api?module=gastracker&action=gasoracle');
-      return JSON.stringify({ source: 'Etherscan', data: data?.result });
+      // Prefer DeFi Agent tool-bridge (Etherscan API V2). Never call Etherscan V1.
+      try {
+        const chain = String(args.chain || 'ethereum');
+        const speed = String(args.speed || 'standard');
+        const params = new URLSearchParams({ chain, speed });
+        const data = await fetchJson(`${TOOL_BASE_URL}/gas/price?${params}`);
+        return JSON.stringify({ source: 'tools.defiagent.llm.christmas/gas/price', data });
+      } catch (bridgeErr: any) {
+        const key = (process.env.ETHERSCAN_API_KEY || '').trim();
+        const params = new URLSearchParams({
+          chainid: '1',
+          module: 'gastracker',
+          action: 'gasoracle',
+        });
+        if (key) params.set('apikey', key);
+        const data = await fetchJson(`https://api.etherscan.io/v2/api?${params}`);
+        if (String(data?.status) === '0' || String(data?.message || '').toUpperCase() === 'NOTOK') {
+          throw new Error(String(data?.result || data?.message || 'Etherscan gas oracle failed'));
+        }
+        return JSON.stringify({
+          source: 'Etherscan API V2',
+          data: data?.result,
+          bridge_fallback: String(bridgeErr?.message || bridgeErr),
+        });
+      }
     }
     return JSON.stringify({ error: `unknown tool: ${name}` });
   } catch (err: any) {

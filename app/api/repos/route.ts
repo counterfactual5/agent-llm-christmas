@@ -12,7 +12,7 @@ export interface RepoStats {
 export async function GET() {
   const headers: HeadersInit = {
     Accept: 'application/vnd.github+json',
-    'User-Agent': 'agent-llm-christmas',
+    'User-Agent': 'defiagent',
   };
   if (process.env.GITHUB_TOKEN) {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;

@@ -117,7 +117,7 @@ export default function AgentPage() {
             </div>
             <div>
               <h1 className="flex items-center gap-2 text-[15px] font-bold text-slate-800 tracking-tight">
-                agent.llm.christmas
+                DeFi Agent
                 <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                   Live Tools
                 </span>
@@ -138,7 +138,7 @@ export default function AgentPage() {
               ))}
             </select>
             <a
-              href="https://llm.christmas"
+              href="https://defiagent.llm.christmas"
               target="_blank"
               rel="noreferrer"
               className="hidden sm:flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition"
