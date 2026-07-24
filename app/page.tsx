@@ -232,7 +232,7 @@ export default function AgentPage() {
                 <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 border border-blue-100 shadow-sm">
                   <Sparkles className="h-6 w-6 text-blue-500" />
                 </div>
-                <h2 className="text-lg font-bold text-slate-800 tracking-tight">Web3 Agent with Live Built-in Tools</h2>
+                <h2 className="text-lg font-bold text-slate-800 tracking-tight">DeFi Agent with Live On-Chain Tools</h2>
                 <p className="mt-2 max-w-md text-sm text-slate-500 leading-relaxed">
                   The agent invokes the published Python packages on a read-only VPS bridge. Try a real package workflow:
                 </p>
